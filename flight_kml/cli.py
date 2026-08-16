@@ -82,15 +82,25 @@ def main(argv=None):
         return 2
 
     client = OpenSky.from_env()
-    age_days = (now - args.date).days
-    if age_days > 7 and not client.authenticated:
-        _eprint(f"note: {args.date_str} is {age_days} days ago; anonymous OpenSky "
-                "access only covers roughly the last 7 days. Set "
-                "OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET (free account) for "
-                "older dates.")
+    # Anonymous OpenSky only serves roughly the last day (empirically ~24-26h).
+    ANON_HORIZON = 22 * 3600  # safety margin below the observed cutoff
 
     begin = int(args.date.timestamp()) - args.pad * 3600
     end = begin + 86400 + 2 * args.pad * 3600
+    if not client.authenticated:
+        cutoff = int(now.timestamp()) - ANON_HORIZON
+        if end <= cutoff:
+            _eprint(f"error: {args.date_str} ±{args.pad}h is entirely beyond "
+                    "anonymous OpenSky's roughly 24-hour history. Set "
+                    "OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET (free account at "
+                    "opensky-network.org) to query older dates.")
+            return 2
+        if begin < cutoff:
+            _eprint(f"note: anonymous access covers roughly the last 24h; "
+                    f"skipping the part of the window before "
+                    f"{_utc(cutoff).strftime('%Y-%m-%d %H:%M')}Z. For older "
+                    "dates set OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET.")
+            begin = cutoff
     _eprint(f"searching {ident.display}"
             + (f" (callsign {ident.icao}{ident.digits})" if ident.icao else
                " (unknown airline prefix, matching any callsign with these digits)")

@@ -108,7 +108,7 @@ def find_flights(client, ident, begin, end, progress=None):
             if exc.status == 403:
                 raise RuntimeError(
                     "OpenSky refused this time range (403). Anonymous access "
-                    "only covers roughly the last 7 days; for older dates set "
+                    "only covers roughly the last day; for older dates set "
                     "OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET from a free "
                     "opensky-network.org account."
                 ) from exc

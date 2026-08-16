@@ -82,6 +82,11 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("no matching flights", err)
 
+    def test_beyond_anonymous_horizon(self):
+        code, _, err = run(["UA888", "2020-01-01"])
+        self.assertEqual(code, 2)
+        self.assertIn("OPENSKY_CLIENT_ID", err)
+
 
 if __name__ == "__main__":
     unittest.main()
