@@ -30,6 +30,7 @@ IATA_TO_ICAO = {
     "TK": "THY", "SU": "AFL", "UX": "AEA",
     # Asia / Oceania
     "NH": "ANA", "JL": "JAL", "KE": "KAL", "OZ": "AAR", "CX": "CPA",
+    "KZ": "NCA", "PO": "PAC", "CK": "CKK",
     "SQ": "SIA", "TG": "THA", "QF": "QFA", "NZ": "ANZ", "VN": "HVN",
     "GA": "GIA", "MH": "MAS", "PR": "PAL", "CI": "CAL", "BR": "EVA",
     "AI": "AIC", "6E": "IGO", "UK": "VTI", "SL": "TLM", "FD": "AIQ",
