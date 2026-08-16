@@ -15,23 +15,20 @@ ET.register_namespace("", KML_NS)
 ET.register_namespace("gx", GX_NS)
 
 
-def _iso(ts):
+def iso(ts):
     return (
         datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
         .strftime("%Y-%m-%dT%H:%M:%SZ")
     )
 
 
-def _clean_points(path):
-    points = []
-    for row in path:
-        ts, lat, lon = row[0], row[1], row[2]
-        if ts is None or lat is None or lon is None:
-            continue
-        alt = row[3] if len(row) > 3 and row[3] is not None else 0.0
-        points.append((int(ts), float(lon), float(lat), float(alt)))
-    points.sort(key=lambda p: p[0])
-    return points
+def describe_flight(display_name, date_str, callsign, points, source):
+    return (
+        f"Flight {display_name} on {date_str} (callsign {callsign}). "
+        f"{len(points)} ADS-B positions, {iso(points[0][0])} to "
+        f"{iso(points[-1][0])} UTC. Altitude is barometric, metres. "
+        f"Track source: {source}."
+    )
 
 
 def build_kml(points, name, description=""):
@@ -56,7 +53,7 @@ def build_kml(points, name, description=""):
     track = ET.SubElement(placemark, f"{{{GX_NS}}}Track")
     ET.SubElement(track, f"{{{KML_NS}}}altitudeMode").text = "absolute"
     for ts, lon, lat, alt in points:
-        ET.SubElement(track, f"{{{KML_NS}}}when").text = _iso(ts)
+        ET.SubElement(track, f"{{{KML_NS}}}when").text = iso(ts)
     for ts, lon, lat, alt in points:
         ET.SubElement(track, f"{{{GX_NS}}}coord").text = f"{lon:.6f} {lat:.6f} {alt:.0f}"
 
@@ -70,19 +67,3 @@ def build_kml(points, name, description=""):
     )
 
     return ET.tostring(kml, encoding="unicode", xml_declaration=True)
-
-
-def kml_from_track(track, display_name, date_str):
-    """track: OpenSky /tracks/all response dict."""
-    points = _clean_points(track.get("path") or [])
-    if not points:
-        raise ValueError("track has no usable points")
-    callsign = (track.get("callsign") or "").strip()
-    start = _iso(points[0][0])
-    end = _iso(points[-1][0])
-    description = (
-        f"Flight {display_name} on {date_str} (callsign {callsign}). "
-        f"{len(points)} ADS-B positions, {start} to {end} UTC. "
-        f"Altitude is barometric, metres. Source: OpenSky Network."
-    )
-    return build_kml(points, f"{display_name} {date_str}", description)

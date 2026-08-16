@@ -31,8 +31,9 @@ class OpenSky:
         self._last_request = 0.0
 
     @classmethod
-    def from_env(cls):
+    def from_env(cls, session=None):
         return cls(
+            session=session,
             client_id=os.environ.get("OPENSKY_CLIENT_ID") or None,
             client_secret=os.environ.get("OPENSKY_CLIENT_SECRET") or None,
         )
@@ -101,6 +102,32 @@ def windows(begin, end):
         t += WINDOW
 
 
+def normalize(f):
+    """OpenSky flight dict -> the shared shape used across sources."""
+    return {
+        "icao24": f["icao24"].lower(),
+        "callsign": (f.get("callsign") or "").strip(),
+        "dep": f.get("estDepartureAirport"),
+        "arr": f.get("estArrivalAirport"),
+        "firstSeen": f["firstSeen"],
+        "lastSeen": f["lastSeen"],
+        "source": "opensky",
+    }
+
+
+def track_points(track):
+    """OpenSky /tracks/all path -> [(unix_ts, lon, lat, alt_m), ...]."""
+    points = []
+    for row in track.get("path") or []:
+        ts, lat, lon = row[0], row[1], row[2]
+        if ts is None or lat is None or lon is None:
+            continue
+        alt = row[3] if len(row) > 3 and row[3] is not None else 0.0
+        points.append((int(ts), float(lon), float(lat), float(alt)))
+    points.sort(key=lambda p: p[0])
+    return points
+
+
 def find_flights(client, ident, begin, end, progress=None):
     """Scan [begin, end] for flights whose callsign matches ident.
 
@@ -126,5 +153,5 @@ def find_flights(client, ident, begin, end, progress=None):
             callsign = (flight.get("callsign") or "").strip()
             if callsign and matches(ident, callsign):
                 key = (flight["icao24"], flight["firstSeen"])
-                seen[key] = flight
+                seen[key] = normalize(flight)
     return sorted(seen.values(), key=lambda f: f["firstSeen"])

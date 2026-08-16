@@ -13,6 +13,8 @@ ALLOWED_HOSTS = frozenset(
     {
         "opensky-network.org",
         "auth.opensky-network.org",
+        "adsb.lol",
+        "samples.adsbexchange.com",
     }
 )
 
@@ -59,3 +61,21 @@ def post_form(session, url, data, timeout=30):
     if resp.status_code != 200:
         raise ApiError(resp.status_code, url, resp.text)
     return resp.json()
+
+
+def get_bytes(session, url, timeout=60):
+    """Raw body; some trace hosts serve gzip without a Content-Encoding
+    header, so callers should sniff magic bytes."""
+    _check_url(url)
+    resp = session.get(url, timeout=timeout)
+    if resp.status_code != 200:
+        raise ApiError(resp.status_code, url, resp.text[:200])
+    return resp.content
+
+
+def gunzip_if_needed(body):
+    if body[:2] == b"\x1f\x8b":
+        import gzip
+
+        return gzip.decompress(body)
+    return body
