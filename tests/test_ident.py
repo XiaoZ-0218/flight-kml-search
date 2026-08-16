@@ -37,6 +37,25 @@ class ParseTest(unittest.TestCase):
                 ident.parse(bad)
 
 
+class TableTest(unittest.TestCase):
+    def test_table_size(self):
+        self.assertGreater(len(ident.IATA_TO_ICAO), 800)
+
+    def test_spot_entries(self):
+        expected = {"CA": "CCA", "UA": "UAL", "KZ": "NCA", "9C": "CQH",
+                    "AZ": "ITY", "SN": "BEL", "VY": "VLG", "SL": "TLM",
+                    "GF": "GFA", "3U": "CSC"}
+        for iata, icao in expected.items():
+            self.assertEqual(ident.IATA_TO_ICAO.get(iata), icao, iata)
+
+    def test_all_values_are_icao_shape(self):
+        for iata, icao in ident.IATA_TO_ICAO.items():
+            self.assertEqual(len(iata), 2)
+            self.assertTrue(iata.isalnum())
+            self.assertEqual(len(icao), 3)
+            self.assertTrue(icao.isalpha())
+
+
 class MatchTest(unittest.TestCase):
     def test_exact_callsign(self):
         p = ident.parse("UA888")

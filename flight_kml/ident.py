@@ -7,9 +7,13 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-# IATA -> ICAO for common airlines. Extend freely; unknown prefixes fall back
-# to suffix matching and listing every candidate callsign.
-IATA_TO_ICAO = {
+from .airlines import IATA_TO_ICAO as _GENERATED
+
+# Hand-curated fixes on top of the generated table (airlines.py). The
+# OpenFlights dataset is stale in places: it misses some Chinese carriers
+# and marks defunct airlines' codes as current (e.g. AZ was Alitalia/AZA,
+# now ITA Airways/ITY).
+CURATED = {
     # China
     "CA": "CCA", "MU": "CES", "CZ": "CSN", "HU": "CHH", "ZH": "CSZ",
     "MF": "CXA", "3U": "CSC", "FM": "CSH", "HO": "DKH", "KN": "CUA",
@@ -17,29 +21,15 @@ IATA_TO_ICAO = {
     "GJ": "CDC", "DR": "RLH", "QW": "QDA", "PN": "CHB", "TV": "TBA",
     "8L": "LKE", "NS": "HBH", "RY": "CJX", "FU": "FZA", "GY": "CGH",
     "BK": "OKA", "AQ": "JXX", "UQ": "CUH", "Y8": "YZR", "O3": "CSS",
-    # North America
-    "UA": "UAL", "AA": "AAL", "DL": "DAL", "WN": "SWA", "B6": "JBU",
-    "AS": "ASA", "NK": "NKS", "F9": "FFT", "AC": "ACA", "WS": "WJA",
-    "AM": "AMX", "AV": "AVA", "CM": "CMP", "AR": "ARG",
-    # Europe
-    "BA": "BAW", "LH": "DLH", "AF": "AFR", "KL": "KLM", "LX": "SWR",
-    "OS": "AUA", "SK": "SAS", "AY": "FIN", "IB": "IBE", "AZ": "ITY",
-    "TP": "TAP", "EI": "EIN", "VS": "VIR", "SN": "BEL", "LO": "LOT",
-    "RO": "ROT", "OU": "CTN", "A3": "AEE", "BT": "BTI", "U2": "EZY",
-    "FR": "RYR", "W6": "WZZ", "VY": "VLG", "EW": "EWG", "PC": "PGT",
-    "TK": "THY", "SU": "AFL", "UX": "AEA",
-    # Asia / Oceania
-    "NH": "ANA", "JL": "JAL", "KE": "KAL", "OZ": "AAR", "CX": "CPA",
+    # cargo
     "KZ": "NCA", "PO": "PAC", "CK": "CKK",
-    "SQ": "SIA", "TG": "THA", "QF": "QFA", "NZ": "ANZ", "VN": "HVN",
-    "GA": "GIA", "MH": "MAS", "PR": "PAL", "CI": "CAL", "BR": "EVA",
-    "AI": "AIC", "6E": "IGO", "UK": "VTI", "SL": "TLM", "FD": "AIQ",
-    "AK": "AXM", "TR": "TGW", "5J": "CEB", "JQ": "JST", "VA": "VOZ",
-    # Middle East / Africa
-    "EK": "UAE", "QR": "QTR", "EY": "ETD", "GF": "GFA", "WY": "OMA",
-    "SV": "SVA", "MS": "MSR", "ET": "ETH", "SA": "SAA", "KQ": "KQA",
-    "AT": "RAM", "RJ": "RJA", "ME": "MEA", "LY": "ELY",
+    # current operators whose codes the dataset maps to defunct airlines
+    "AZ": "ITY",
+    # dataset maps these to smaller carriers sharing the IATA code
+    "SN": "BEL", "VY": "VLG", "SL": "TLM", "GF": "GFA",
 }
+
+IATA_TO_ICAO = {**_GENERATED, **CURATED}
 
 # Non-greedy prefix so "UA888" splits as UA/888, not UA8/88. Airline prefixes
 # are 2-3 letters (IATA or ICAO) or digit+letter / letter+digit IATA codes
