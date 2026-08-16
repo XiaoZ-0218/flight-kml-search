@@ -60,17 +60,26 @@ class OpenSky:
         return {"Authorization": f"Bearer {self._token}"}
 
     def _get(self, path, params):
-        if not self.authenticated:
-            wait = ANON_DELAY - (time.time() - self._last_request)
-            if wait > 0:
-                time.sleep(wait)
-        try:
-            return http.get_json(
-                self.session, API + path, params=params,
-                headers=self._auth_headers(),
-            )
-        finally:
-            self._last_request = time.time()
+        last_exc = None
+        for attempt in range(4):
+            if not self.authenticated:
+                wait = ANON_DELAY - (time.time() - self._last_request)
+                if wait > 0:
+                    time.sleep(wait)
+            try:
+                return http.get_json(
+                    self.session, API + path, params=params,
+                    headers=self._auth_headers(),
+                )
+            except http.ApiError as exc:
+                self._last_request = time.time()
+                if exc.status != 429 or attempt == 3:
+                    raise
+                last_exc = exc
+                time.sleep(10 * (attempt + 1))
+            finally:
+                self._last_request = time.time()
+        raise last_exc
 
     def flights(self, begin, end):
         """All flights first seen in [begin, end] (unix seconds)."""

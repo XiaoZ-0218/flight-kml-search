@@ -49,6 +49,28 @@ class FindFlightsTest(unittest.TestCase):
         self.assertIn("OPENSKY_CLIENT_ID", str(ctx.exception))
 
 
+class RetryTest(unittest.TestCase):
+    def test_retries_on_429(self):
+        client = OpenSky()
+        calls = [http.ApiError(429, "u", "slow down"),
+                 http.ApiError(429, "u", "slow down"),
+                 [{"icao24": "a1b2c3"}]]
+        with mock.patch.object(http, "get_json", side_effect=calls) as gj, \
+             mock.patch("time.sleep"):
+            result = client.flights(0, 100)
+        self.assertEqual(result, [{"icao24": "a1b2c3"}])
+        self.assertEqual(gj.call_count, 3)
+
+    def test_gives_up_after_retries(self):
+        client = OpenSky()
+        with mock.patch.object(
+            http, "get_json",
+            side_effect=http.ApiError(429, "u", "slow down"),
+        ), mock.patch("time.sleep"):
+            with self.assertRaises(http.ApiError):
+                client.flights(0, 100)
+
+
 class AuthTest(unittest.TestCase):
     def test_anonymous_by_default(self):
         client = OpenSky()

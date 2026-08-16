@@ -20,6 +20,20 @@ def _utc(ts):
     return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
 
 
+def _parse_clock(text, date):
+    """'HH:MM' (on date) or 'YYYY-MM-DD HH:MM', always UTC."""
+    text = text.strip()
+    for fmt, base in (("%H:%M", date), ("%Y-%m-%d %H:%M", None)):
+        try:
+            t = datetime.datetime.strptime(text, fmt)
+            if base is not None:
+                t = t.replace(year=base.year, month=base.month, day=base.day)
+            return t.replace(tzinfo=datetime.timezone.utc)
+        except ValueError:
+            continue
+    raise ValueError(f"bad time {text!r}, expected 'HH:MM' or 'YYYY-MM-DD HH:MM'")
+
+
 def _parse_date(text):
     try:
         return datetime.datetime.strptime(text, "%Y-%m-%d").replace(
@@ -63,6 +77,12 @@ def main(argv=None):
     parser.add_argument("--pad", type=int, default=12, metavar="HOURS",
                         help="search this many hours before/after the UTC date "
                              "(default 12; covers local-timezone spillover)")
+    parser.add_argument("--utc-from", metavar="TIME",
+                        help='narrow the scan window start: "HH:MM" (on the '
+                             'given date) or "YYYY-MM-DD HH:MM", UTC. Saves '
+                             'API quota when you roughly know departure time.')
+    parser.add_argument("--utc-to", metavar="TIME",
+                        help='narrow the scan window end, same format')
     parser.add_argument("--pick", type=int, metavar="N",
                         help="download the Nth listed flight (1-based) as KML")
     parser.add_argument("--out", default=".", help="output directory (default: cwd)")
@@ -87,6 +107,17 @@ def main(argv=None):
 
     begin = int(args.date.timestamp()) - args.pad * 3600
     end = begin + 86400 + 2 * args.pad * 3600
+    try:
+        if args.utc_from:
+            begin = int(_parse_clock(args.utc_from, args.date).timestamp())
+        if args.utc_to:
+            end = int(_parse_clock(args.utc_to, args.date).timestamp())
+    except ValueError as exc:
+        _eprint(f"error: {exc}")
+        return 2
+    if end <= begin:
+        _eprint("error: scan window is empty (check --utc-from/--utc-to)")
+        return 2
     if not client.authenticated:
         cutoff = int(now.timestamp()) - ANON_HORIZON
         if end <= cutoff:

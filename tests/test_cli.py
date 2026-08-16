@@ -87,6 +87,26 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("OPENSKY_CLIENT_ID", err)
 
+    def test_utc_range_overrides_pad(self):
+        import datetime
+        # authenticated mode skips the anonymous-horizon clipping
+        self.client.authenticated = True
+        with mock.patch.object(cli, "find_flights", return_value=[]) as ff:
+            run(["UA888", "2026-08-15", "--utc-from", "17:00",
+                 "--utc-to", "2026-08-16 06:00"])
+        begin, end = ff.call_args[0][2:4]
+        utc = datetime.timezone.utc
+        self.assertEqual(begin, int(datetime.datetime(2026, 8, 15, 17, 0,
+                                                      tzinfo=utc).timestamp()))
+        self.assertEqual(end, int(datetime.datetime(2026, 8, 16, 6, 0,
+                                                    tzinfo=utc).timestamp()))
+
+    def test_bad_utc_range(self):
+        code, _, err = run(["UA888", "2026-08-15", "--utc-from", "20:00",
+                            "--utc-to", "18:00"])
+        self.assertEqual(code, 2)
+        self.assertIn("empty", err)
+
 
 if __name__ == "__main__":
     unittest.main()
