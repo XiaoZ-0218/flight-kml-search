@@ -58,8 +58,8 @@ mainland-China coverage is thin, and some airframes are blocked entirely
 ## How to run
 
 ```bash
-uv run "/Users/zhangxiao/.zcode/skills/flight-kml-search/main.py" <FLIGHT> <YYYY-MM-DD> [flags]
-```
+	uv run "/Users/zhangxiao/.agents/skills/flight-kml-search/main.py" <FLIGHT> <YYYY-MM-DD> [flags]
+	```
 
 Requires `uv` (`brew install uv`). PEP 723 inline metadata resolves the single
 dependency (`requests`) into uv's cache — no venv or `cd` needed. Without uv:
@@ -72,7 +72,7 @@ Two runs: search → download the instance you picked.
 1. **Search** and read the instance list (stderr):
 
    ```bash
-   uv run "/Users/zhangxiao/.zcode/skills/flight-kml-search/main.py" UA888 2026-08-15
+   uv run "/Users/zhangxiao/.agents/skills/flight-kml-search/main.py" UA888 2026-08-15
    ```
 
 2. **Pick the right instance** (usually only one per day; multiple rows mean
@@ -80,7 +80,7 @@ Two runs: search → download the instance you picked.
    route and times against what the user described), then download:
 
    ```bash
-   uv run "/Users/zhangxiao/.zcode/skills/flight-kml-search/main.py" UA888 2026-08-15 --pick 1
+   uv run "/Users/zhangxiao/.agents/skills/flight-kml-search/main.py" UA888 2026-08-15 --pick 1
    ```
 
    The saved file's absolute path is printed on **stdout** (last line);
@@ -139,5 +139,5 @@ The CSV source ignores these flags (it reads whole-day files anyway).
   doesn't scrape it.
 - Offline tests (stdlib unittest, no network): from this directory run
   `uv run --with requests python -m unittest discover -s tests -t .`
-- Development home: the `flights kml search` workspace project; sync changes
-  into the skill copies (`~/.zcode/skills/` and `~/.agents/skills/`).
+- This directory is the skill. Keep the GitHub repo name and the `name:` field
+  as `flight-kml-search`.
