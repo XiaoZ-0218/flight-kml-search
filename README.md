@@ -79,7 +79,7 @@ uv run main.py DL2237 2026-07-01 --source csv --pick 1
 
 ## 作为 agent skill 使用
 
-本目录同时是一个自包含的 Claude / ZCode skill：把整个目录放到 `~/.zcode/skills/flight-kml-search/`（或 `~/.agents/skills/`）即可被 agent 触发，调用约定见 [SKILL.md](SKILL.md)（flags、退出码、班次挑选启发式）。
+本目录同时是一个自包含 skill。仓库名和 skill 名都是 `flight-kml-search`（旧仓库名 `flights-kml-search` 会重定向到这里）。把整个目录放到 `~/.agents/skills/flight-kml-search/` 即可被 agent 触发，调用约定见 [SKILL.md](SKILL.md)（flags、退出码、班次挑选启发式）。
 
 ---
 
