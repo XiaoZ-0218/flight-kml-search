@@ -23,18 +23,44 @@ def iso(ts):
 
 
 def describe_flight(display_name, date_str, callsign, points, source):
+    span = (f"{iso(points[0][0])} to {iso(points[-1][0])} UTC"
+            if points else "no usable positions")
     return (
         f"Flight {display_name} on {date_str} (callsign {callsign}). "
-        f"{len(points)} ADS-B positions, {iso(points[0][0])} to "
-        f"{iso(points[-1][0])} UTC. Altitude is barometric, metres. "
-        f"Track source: {source}."
+        f"{len(points)} ADS-B positions, {span}. Altitude is barometric, "
+        f"metres. Track source: {source}."
     )
 
 
+def _fill_altitudes(points):
+    """Replace None altitudes with the nearest known value (forward, then
+    backward for any leading run). Ground points at elevated airports
+    shouldn't sink to 0 m under absolute altitudeMode."""
+    filled = list(points)
+    last = None
+    for i, (ts, lon, lat, alt) in enumerate(filled):
+        if alt is None:
+            if last is not None:
+                filled[i] = (ts, lon, lat, last)
+        else:
+            last = alt
+    nxt = None
+    for i in range(len(filled) - 1, -1, -1):
+        ts, lon, lat, alt = filled[i]
+        if alt is None:
+            if nxt is not None:
+                filled[i] = (ts, lon, lat, nxt)
+        else:
+            nxt = alt
+    return [(ts, lon, lat, 0.0 if alt is None else alt)
+            for ts, lon, lat, alt in filled]
+
+
 def build_kml(points, name, description=""):
-    """points: cleaned [(ts, lon, lat, alt_m), ...]; returns KML text."""
+    """points: cleaned [(ts, lon, lat, alt_m|None), ...]; returns KML text."""
     if not points:
         raise ValueError("track has no usable points")
+    points = _fill_altitudes(points)
     kml = ET.Element(f"{{{KML_NS}}}kml")
     doc = ET.SubElement(kml, f"{{{KML_NS}}}Document")
     ET.SubElement(doc, f"{{{KML_NS}}}name").text = name

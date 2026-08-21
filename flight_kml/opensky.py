@@ -1,8 +1,8 @@
 """OpenSky Network REST client.
 
-Anonymous access covers roughly the last 7 days. Older dates need a free
-OpenSky account's OAuth2 client credentials in OPENSKY_CLIENT_ID /
-OPENSKY_CLIENT_SECRET.
+Anonymous access covers roughly the last 24 hours (empirically ~24-26h).
+Older dates need a free OpenSky account's OAuth2 client credentials in
+OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET.
 """
 import os
 import time
@@ -116,14 +116,19 @@ def normalize(f):
 
 
 def track_points(track):
-    """OpenSky /tracks/all path -> [(unix_ts, lon, lat, alt_m), ...]."""
+    """OpenSky /tracks/all path -> [(unix_ts, lon, lat, alt_m|None), ...].
+
+    Missing altitudes stay None; kml.build_kml fills them from neighbours so
+    ground points at elevated airports don't sink to sea level.
+    """
     points = []
     for row in track.get("path") or []:
         ts, lat, lon = row[0], row[1], row[2]
         if ts is None or lat is None or lon is None:
             continue
-        alt = row[3] if len(row) > 3 and row[3] is not None else 0.0
-        points.append((int(ts), float(lon), float(lat), float(alt)))
+        alt = row[3] if len(row) > 3 else None
+        points.append((int(ts), float(lon), float(lat),
+                       None if alt is None else float(alt)))
     points.sort(key=lambda p: p[0])
     return points
 

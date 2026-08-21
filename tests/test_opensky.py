@@ -2,7 +2,8 @@ import unittest
 from unittest import mock
 
 from flight_kml import http, ident
-from flight_kml.opensky import WINDOW, OpenSky, find_flights, windows
+from flight_kml.opensky import (WINDOW, OpenSky, find_flights, track_points,
+                                windows)
 
 FLIGHTS = [
     {"icao24": "a1b2c3", "firstSeen": 1000, "lastSeen": 2000,
@@ -29,6 +30,17 @@ class WindowsTest(unittest.TestCase):
 
     def test_empty_range(self):
         self.assertEqual(list(windows(100, 100)), [])
+
+
+class TrackPointsTest(unittest.TestCase):
+    def test_extracts_sorts_and_keeps_missing_alt(self):
+        track = {"path": [[200, 38.0, -122.0, 1000.0, 90, False],
+                          [100, 37.0, -123.0, None, 90, False],
+                          [300, None, -121.0, 2000.0, 90, False]]}
+        pts = track_points(track)
+        self.assertEqual([p[0] for p in pts], [100, 200])  # None lat dropped
+        self.assertIsNone(pts[0][3])
+        self.assertEqual(pts[1][3], 1000.0)
 
 
 class FindFlightsTest(unittest.TestCase):
