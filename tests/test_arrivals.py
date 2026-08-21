@@ -95,6 +95,20 @@ class FindFlightsCsvTest(unittest.TestCase):
             self.assertEqual(gb.call_count, 1)  # only day+1 needed downloading
             self.assertEqual(len(flights), 1)
 
+    def test_download_writes_atomically(self):
+        # both days serve the same CSV; the duplicate (hex, depTime) dedupes
+        with TempDir() as d:
+            with mock.patch.object(arrivals, "_cache_dir", return_value=d), \
+                 mock.patch.object(http, "get_bytes",
+                                   return_value=make_csv(ROW_GOOD).encode()):
+                flights = arrivals.find_flights_csv(FakeSession(),
+                                                    ident.parse("UA888"), DATE)
+            self.assertEqual(len(flights), 1)
+            leftover_tmps = [p.name for p in d.iterdir()
+                             if p.name.endswith(".tmp")]
+            self.assertEqual(leftover_tmps, [])
+            self.assertTrue((d / "ax_arrivals_20260815.csv").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

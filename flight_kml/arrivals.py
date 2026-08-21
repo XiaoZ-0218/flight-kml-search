@@ -36,7 +36,11 @@ def _csv_path(session, day, log=None):
         log(f"  downloading {day.strftime('%Y-%m-%d')} arrivals CSV (~13 MB) ...")
     body = http.get_bytes(session, url, timeout=180)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(http.gunzip_if_needed(body))
+    # write-then-rename: a crash mid-write must not leave a truncated file
+    # that path.exists() would trust on the next run
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(http.gunzip_if_needed(body))
+    os.replace(tmp, path)
     return path
 
 
