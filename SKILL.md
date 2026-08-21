@@ -114,7 +114,7 @@ The CSV source ignores these flags (it reads whole-day files anyway).
 | --- | --- |
 | `--source auto\|opensky\|csv` | Discovery source (default auto). |
 | `--pick N` | Download the Nth listed flight (1-based) as KML. Without it, only list. |
-| `--pad HOURS` | OpenSky scan: hours before/after the UTC date (default 12). |
+| `--pad HOURS` | OpenSky scan: hours before/after the UTC date (default 12, max 48). |
 | `--utc-from T` / `--utc-to T` | Narrow OpenSky scan window, UTC (`HH:MM` or `YYYY-MM-DD HH:MM`). |
 | `--out DIR` | Output directory (default: current directory). |
 | `--name STR` | Output filename override. |

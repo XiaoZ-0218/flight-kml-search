@@ -13,8 +13,8 @@
 - 🕐 **时间感知选路** — 最近约 24 小时的航班走 OpenSky 匿名接口；更早的日期自动切换到 ADSBexchange 每日 arrivals CSV 存档（可追溯到 2024-07，轨迹存档最老到 2016 年）。
 - 🗺️ **高分辨率轨迹** — 优先使用 adsb.lol 的 5 秒级全天 ADS-B trace，按起降时刻切片，比 OpenSky 的稀疏轨迹点数多一个量级。
 - 🔤 **航班号自动转换** — IATA 航班号（UA888、3U8735）自动映射到 ICAO 呼号（UAL888、CSC8735），内置 941 家航司对照表；查不到的航司退化为按数字段模糊匹配并列出全部候选。
-- 🛡️ **严格的出口策略** — 仅 https、主机白名单、拒绝环回/私网/保留地址。
-- 🧪 **离线测试套件** — stdlib `unittest`，49 个用例，无网络依赖。
+- 🛡️ **严格的出口策略** — 仅 https、主机白名单、不跟随重定向、拒绝环回/私网/保留等非公网地址。
+- 🧪 **离线测试套件** — stdlib `unittest`，64 个用例，无网络依赖。
 - 🪶 **零安装** — 通过 [PEP 723](https://peps.python.org/pep-0723/) 内联依赖声明，`uv run` 临时解决唯一依赖（`requests`），无需 clone 或建 venv。
 
 ---
@@ -86,7 +86,7 @@ uv run main.py DL2237 2026-07-01 --source csv --pick 1
 ## 开发
 
 ```bash
-# 离线测试（49 个用例，无网络）
+# 离线测试（64 个用例，无网络）
 uv run --with requests python -m unittest discover -s tests -t .
 
 # 重新生成航司对照表（数据集更新后）
