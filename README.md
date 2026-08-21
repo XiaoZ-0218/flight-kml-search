@@ -10,11 +10,11 @@
 
 - ✈️ **搜索 → 列班次 → 下载 KML** 三段式 CLI；同一天有多个匹配班次时列出表格，由调用方挑选，程序不擅自决定。
 - 🌐 **多源自动 failover** — 「找航班」和「取轨迹」两层各有多个免费源，失败自动切换（详见下文数据源表）。
-- 🕐 **时间感知选路** — 最近约 24 小时的航班走 OpenSky 匿名接口；更早的日期自动切换到 ADSBexchange 每日 arrivals CSV 存档（可追溯到 2024-07，轨迹存档最老到 2016 年）。
+- 🕐 **时间感知选路** — 当天（UTC）的航班走 OpenSky 匿名接口；更早的日期自动切换到 ADSBexchange 每日 arrivals CSV 存档（可追溯到 2024-07，轨迹存档最老到 2016 年）。
 - 🗺️ **高分辨率轨迹** — 优先使用 adsb.lol 的 5 秒级全天 ADS-B trace，按起降时刻切片，比 OpenSky 的稀疏轨迹点数多一个量级。
 - 🔤 **航班号自动转换** — IATA 航班号（UA888、3U8735）自动映射到 ICAO 呼号（UAL888、CSC8735），内置 941 家航司对照表；查不到的航司退化为按数字段模糊匹配并列出全部候选。
 - 🛡️ **严格的出口策略** — 仅 https、主机白名单、不跟随重定向、拒绝环回/私网/保留等非公网地址。
-- 🧪 **离线测试套件** — stdlib `unittest`，64 个用例，无网络依赖。
+- 🧪 **离线测试套件** — stdlib `unittest`，67 个用例，无网络依赖。
 - 🪶 **零安装** — 通过 [PEP 723](https://peps.python.org/pep-0723/) 内联依赖声明，`uv run` 临时解决唯一依赖（`requests`），无需 clone 或建 venv。
 
 ---
@@ -49,7 +49,7 @@ uv run main.py DL2237 2026-07-01 --source csv --pick 1
 
 | 源 | 覆盖 | 说明 |
 | --- | --- | --- |
-| `opensky` | 匿名约最近 24h；配免费凭据可查历史 | 匿名每日配额很小，429 即当日用尽 |
+| `opensky` | 匿名仅限当前 UTC 日（2026-08-22 起实测：更早窗口一律 403）；配免费凭据可查历史 | 匿名每日配额很小，429 即当日用尽 |
 | `csv` | 2024-07 起，**临近当下有数周缺口** | ADSBexchange 每日 arrivals CSV（约 13 MB/天，缓存于 `~/.cache/flight-kml-search`），按**到达日**归档 |
 
 `--source auto`（默认）：日期在匿名可达范围或已配凭据时用 OpenSky，否则用 CSV；OpenSky 查不到且日期够老时自动回退 CSV。
@@ -86,7 +86,7 @@ uv run main.py DL2237 2026-07-01 --source csv --pick 1
 ## 开发
 
 ```bash
-# 离线测试（64 个用例，无网络）
+# 离线测试（67 个用例，无网络）
 uv run --with requests python -m unittest discover -s tests -t .
 
 # 重新生成航司对照表（数据集更新后）
