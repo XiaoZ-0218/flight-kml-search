@@ -1,8 +1,8 @@
 """Command line workflow: search flight instances, then download one as KML.
 
 Discovery (flight number + date -> instances):
-  - opensky: OpenSky flights/all scan. Anonymous covers roughly the last 24h;
-    set OPENSKY_CLIENT_ID/SECRET for older dates.
+  - opensky: OpenSky flights/all scan. Anonymous covers only the current UTC
+    day; set OPENSKY_CLIENT_ID/SECRET for older dates.
   - csv: ADSBexchange daily arrivals CSV (free, no quota; covers ~2024-07
     onward with gaps near the present).
   - auto (default): opensky when reachable for the date, csv otherwise; if
@@ -22,11 +22,21 @@ import sys
 from . import arrivals, http, ident as ident_mod, kml as kml_mod, traces
 from .opensky import OpenSky, find_flights, track_points
 
-# Anonymous OpenSky only serves roughly the last day (empirically ~24-26h).
-ANON_HORIZON = 22 * 3600  # safety margin below the observed cutoff
+# Anonymous OpenSky only serves the current UTC day: windows ending before
+# today's 00:00 UTC get 403 "You cannot access historical flights"
+# (empirically verified 2026-08-22). Stay a few minutes past midnight to
+# keep clear of the boundary.
+ANON_DAY_MARGIN = 600
 # The CSV archive lags behind the present; don't fall back to it for dates
 # younger than this.
 CSV_MIN_AGE = 3 * 86400
+
+
+def _anon_cutoff(now):
+    """First unix second anonymous OpenSky will serve: today's UTC midnight
+    plus a small safety margin."""
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return int(day_start.timestamp()) + ANON_DAY_MARGIN
 
 
 def _eprint(*args):
@@ -83,7 +93,8 @@ def _out_path(args, ident, flight):
     return pathlib.Path(args.out).expanduser().resolve() / filename
 
 
-def main(argv=None):
+def main(argv=None, now=None):
+    """now: injectable UTC clock (tests); defaults to the real current time."""
     parser = argparse.ArgumentParser(
         prog="flight-kml-search",
         description="Find a flight by number and date and save its track "
@@ -125,7 +136,7 @@ def main(argv=None):
         _eprint(f"error: {exc}")
         return 2
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
     if args.date > now:
         _eprint("error: date is in the future")
         return 2
@@ -133,7 +144,7 @@ def main(argv=None):
     session = http.make_session()
     client = OpenSky.from_env(session=session)
     now_ts = int(now.timestamp())
-    cutoff = now_ts - ANON_HORIZON
+    cutoff = _anon_cutoff(now)
 
     begin = int(args.date.timestamp()) - args.pad * 3600
     end = begin + 86400 + 2 * args.pad * 3600
@@ -165,13 +176,13 @@ def main(argv=None):
     if source == "opensky":
         if not client.authenticated and begin < cutoff:
             if end <= cutoff:
-                _eprint(f"error: {args.date_str} ±{args.pad}h is entirely beyond "
-                        "anonymous OpenSky's roughly 24-hour history. Set "
-                        "OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET, or retry "
-                        "with --source csv.")
+                _eprint(f"error: {args.date_str} ±{args.pad}h is entirely "
+                        "before today (UTC); anonymous OpenSky only serves "
+                        "the current UTC day. Set OPENSKY_CLIENT_ID / "
+                        "OPENSKY_CLIENT_SECRET, or retry with --source csv.")
                 return 2
-            _eprint(f"note: anonymous access covers roughly the last 24h; "
-                    f"skipping the part of the window before "
+            _eprint(f"note: anonymous access only covers the current UTC "
+                    f"day; skipping the part of the window before "
                     f"{_utc(cutoff).strftime('%Y-%m-%d %H:%M')}Z.")
             begin = cutoff
 

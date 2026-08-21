@@ -6,16 +6,17 @@ from unittest import mock
 
 from flight_kml import cli
 
-# Dates are relative to the clock: the CLI routes on "is the date inside the
-# anonymous OpenSky horizon", so hardcoded dates would age out of it.
-NOW = datetime.datetime.now(datetime.timezone.utc)
-RECENT = NOW - datetime.timedelta(days=1)  # inside the ~24h anonymous horizon
-OLD = NOW - datetime.timedelta(days=10)    # old enough for the CSV archive
-RECENT_STR = RECENT.strftime("%Y-%m-%d")
+# A fixed clock is injected into cli.main: routing depends on "now" vs the
+# anonymous-OpenSky boundary (current UTC day), so wall-clock-relative dates
+# would make the suite time-dependent.
+NOW = datetime.datetime(2026, 8, 21, 16, 0, tzinfo=datetime.timezone.utc)
+TODAY = NOW                       # the only slice anonymous OpenSky serves
+OLD = NOW - datetime.timedelta(days=10)  # old enough for the CSV archive
+TODAY_STR = TODAY.strftime("%Y-%m-%d")
 OLD_STR = OLD.strftime("%Y-%m-%d")
 
-FIRST_SEEN = int(RECENT.replace(hour=0, minute=0, second=0,
-                                microsecond=0).timestamp())
+FIRST_SEEN = int(TODAY.replace(hour=0, minute=0, second=0,
+                               microsecond=0).timestamp())
 FLIGHT = {
     "icao24": "a1b2c3", "callsign": "UAL888", "dep": "KSFO", "arr": "ZBAA",
     "firstSeen": FIRST_SEEN, "lastSeen": FIRST_SEEN + 3600, "source": "opensky",
@@ -31,7 +32,7 @@ OPENSKY_TRACK = {
 def run(argv):
     out, err = io.StringIO(), io.StringIO()
     with redirect_stdout(out), redirect_stderr(err):
-        code = cli.main(argv)
+        code = cli.main(argv, now=NOW)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -55,7 +56,7 @@ class CliTest(unittest.TestCase):
         self.client = client
 
     def test_search_lists_without_downloading(self):
-        code, out, err = run(["UA888", RECENT_STR])
+        code, out, err = run(["UA888", TODAY_STR])
         self.assertEqual(code, 0)
         self.assertEqual(out, "")  # nothing on stdout without --pick
         self.assertIn("UAL888", err)
@@ -64,20 +65,20 @@ class CliTest(unittest.TestCase):
 
     def test_pick_downloads_kml_from_trace_source(self):
         with mock.patch("pathlib.Path.write_text") as write:
-            code, out, err = run(["UA888", RECENT_STR, "--pick", "1"])
+            code, out, err = run(["UA888", TODAY_STR, "--pick", "1"])
         self.assertEqual(code, 0)
         self.client.track.assert_not_called()  # trace source sufficed
         saved = write.call_args[0][0]
         self.assertIn("<gx:coord>", saved)
         self.assertIn("adsb.lol", saved)
         self.assertTrue(out.strip().endswith(
-            f"UA888_{RECENT_STR}_0000Z.kml"))
+            f"UA888_{TODAY_STR}_0000Z.kml"))
 
     def test_pick_falls_back_to_opensky_track(self):
         with mock.patch.object(cli.traces, "get_track_points",
                                side_effect=LookupError("no trace")), \
              mock.patch("pathlib.Path.write_text") as write:
-            code, out, err = run(["UA888", RECENT_STR, "--pick", "1"])
+            code, out, err = run(["UA888", TODAY_STR, "--pick", "1"])
         self.assertEqual(code, 0)
         self.client.track.assert_called_once_with("a1b2c3", FIRST_SEEN)
         self.assertIn("<gx:coord>", write.call_args[0][0])
@@ -86,34 +87,34 @@ class CliTest(unittest.TestCase):
         self.client.track.side_effect = cli.http.ApiError(404, "u", "no track")
         with mock.patch.object(cli.traces, "get_track_points",
                                side_effect=LookupError("no trace")):
-            code, _, err = run(["UA888", RECENT_STR, "--pick", "1"])
+            code, _, err = run(["UA888", TODAY_STR, "--pick", "1"])
         self.assertEqual(code, 3)
         self.assertIn("no stored track", err)
 
     def test_pick_out_of_range(self):
-        code, out, err = run(["UA888", RECENT_STR, "--pick", "9"])
+        code, out, err = run(["UA888", TODAY_STR, "--pick", "9"])
         self.assertEqual(code, 2)
 
     def test_pick_zero_is_an_error_not_a_listing(self):
-        code, _, err = run(["UA888", RECENT_STR, "--pick", "0"])
+        code, _, err = run(["UA888", TODAY_STR, "--pick", "0"])
         self.assertEqual(code, 2)
         self.assertIn("--pick", err)
 
     def test_name_must_be_a_plain_filename(self):
         for bad in ("../escape", "a/b", ".."):
-            code, _, err = run(["UA888", RECENT_STR, "--pick", "1",
+            code, _, err = run(["UA888", TODAY_STR, "--pick", "1",
                                 "--name", bad])
             self.assertEqual(code, 2, bad)
             self.assertIn("--name", err)
 
     def test_pad_out_of_range(self):
         for bad in ("-1", "100"):
-            code, _, err = run(["UA888", RECENT_STR, "--pad", bad])
+            code, _, err = run(["UA888", TODAY_STR, "--pad", bad])
             self.assertEqual(code, 2, bad)
             self.assertIn("--pad", err)
 
     def test_bad_ident(self):
-        code, _, err = run(["888", RECENT_STR])
+        code, _, err = run(["888", TODAY_STR])
         self.assertEqual(code, 2)
         self.assertIn("cannot parse", err)
 
@@ -125,7 +126,7 @@ class CliTest(unittest.TestCase):
     def test_no_flights_recent_date(self):
         # recent date: no CSV fallback (archive lags), just report
         with mock.patch.object(cli, "find_flights", return_value=[]):
-            code, _, err = run(["UA888", RECENT_STR])
+            code, _, err = run(["UA888", TODAY_STR])
         self.assertEqual(code, 1)
         self.assertIn("no matching flights", err)
 
@@ -167,6 +168,23 @@ class CliTest(unittest.TestCase):
             run(["UA888", NOW.strftime("%Y-%m-%d")])
         begin, end = ff.call_args[0][2:4]
         self.assertLessEqual(end, int(NOW.timestamp()))
+
+    def test_yesterday_window_clipped_to_utc_midnight(self):
+        # the anonymous cutoff is today's 00:00 UTC + margin, not a rolling
+        # 24h horizon (OpenSky policy verified 2026-08-22)
+        with mock.patch.object(cli, "find_flights", return_value=[]) as ff:
+            run(["UA888", "2026-08-20"])
+        begin, end = ff.call_args[0][2:4]
+        utc = datetime.timezone.utc
+        self.assertEqual(begin, int(datetime.datetime(2026, 8, 21, 0, 10,
+                                                      tzinfo=utc).timestamp()))
+        self.assertEqual(end, int(datetime.datetime(2026, 8, 21, 12, 0,
+                                                    tzinfo=utc).timestamp()))
+
+    def test_old_date_forced_opensky_anonymous_errors(self):
+        code, _, err = run(["UA888", OLD_STR, "--source", "opensky"])
+        self.assertEqual(code, 2)
+        self.assertIn("current UTC day", err)
 
     def test_bad_utc_range(self):
         code, _, err = run(["UA888", "2026-08-15", "--utc-from", "20:00",

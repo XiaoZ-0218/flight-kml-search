@@ -1,8 +1,9 @@
 """OpenSky Network REST client.
 
-Anonymous access covers roughly the last 24 hours (empirically ~24-26h).
-Older dates need a free OpenSky account's OAuth2 client credentials in
-OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET.
+Anonymous access only covers the current UTC day — windows ending before
+00:00 UTC get 403 "You cannot access historical flights" (verified
+2026-08-22). Older dates need a free OpenSky account's OAuth2 client
+credentials in OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET.
 """
 import os
 import time
@@ -149,7 +150,7 @@ def find_flights(client, ident, begin, end, progress=None):
             if exc.status == 403:
                 raise RuntimeError(
                     "OpenSky refused this time range (403). Anonymous access "
-                    "only covers roughly the last day; for older dates set "
+                    "only covers the current UTC day; for older dates set "
                     "OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET from a free "
                     "opensky-network.org account."
                 ) from exc
