@@ -34,12 +34,19 @@ def _csv_path(session, day, log=None):
                      d=day.strftime("%d"))
     if log:
         log(f"  downloading {day.strftime('%Y-%m-%d')} arrivals CSV (~13 MB) ...")
-    body = http.get_bytes(session, url, timeout=180)
+    body = http.gunzip_if_needed(http.get_bytes(session, url, timeout=180))
+    # The host answers some missing days with 200 + an HTML error page;
+    # caching that would silently hide the day's flights forever.
+    head = body[:512]
+    if b"callsign" not in head or b"depTime" not in head:
+        raise http.ApiError(200, url,
+                            "response is not the arrivals CSV "
+                            "(HTML error page?); not caching it")
     path.parent.mkdir(parents=True, exist_ok=True)
     # write-then-rename: a crash mid-write must not leave a truncated file
     # that path.exists() would trust on the next run
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(http.gunzip_if_needed(body))
+    tmp.write_bytes(body)
     os.replace(tmp, path)
     return path
 
@@ -67,8 +74,7 @@ def find_flights_csv(session, ident, date, log=None):
             path = _csv_path(session, day, log=log)
         except http.ApiError as exc:
             if log:
-                log(f"  arrivals CSV {day.strftime('%Y-%m-%d')}: HTTP "
-                    f"{exc.status}")
+                log(f"  arrivals CSV {day.strftime('%Y-%m-%d')}: {exc}")
             continue
         any_csv = True
         for row in _rows(path):

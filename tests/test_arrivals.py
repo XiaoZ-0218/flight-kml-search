@@ -109,6 +109,19 @@ class FindFlightsCsvTest(unittest.TestCase):
             self.assertEqual(leftover_tmps, [])
             self.assertTrue((d / "ax_arrivals_20260815.csv").exists())
 
+    def test_html_error_page_not_cached(self):
+        # the host answers some missing days with 200 + an HTML error page;
+        # caching that would silently hide the day's flights forever
+        html = b"<!doctype html><html><body>not found</body></html>"
+        with TempDir() as d:
+            with mock.patch.object(arrivals, "_cache_dir", return_value=d), \
+                 mock.patch.object(http, "get_bytes", return_value=html):
+                with self.assertRaises(http.ApiError) as ctx:
+                    arrivals.find_flights_csv(FakeSession(),
+                                              ident.parse("UA888"), DATE)
+            self.assertIn("no arrivals CSV", str(ctx.exception))
+            self.assertEqual(list(d.iterdir()), [])  # nothing cached
+
 
 if __name__ == "__main__":
     unittest.main()
