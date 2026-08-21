@@ -52,7 +52,7 @@ class ParsedIdent:
 
 def parse(text):
     """Parse 'ua 888' / 'UA-888' / 'UAL888' into a ParsedIdent."""
-    norm = re.sub(r"\s+", "", text.upper())
+    norm = re.sub(r"[\s-]+", "", text.upper())
     m = _IDENT_RE.match(norm)
     if not m or not _PREFIX_RE.match(m.group(1)):
         raise ValueError(
