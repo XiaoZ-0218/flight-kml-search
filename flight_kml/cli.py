@@ -97,7 +97,8 @@ def main(argv=None):
                              "recent dates, arrivals CSV for older ones)")
     parser.add_argument("--pad", type=int, default=12, metavar="HOURS",
                         help="OpenSky scan: hours before/after the UTC date "
-                             "(default 12; covers local-timezone spillover)")
+                             "(default 12, max 48; covers local-timezone "
+                             "spillover)")
     parser.add_argument("--utc-from", metavar="TIME",
                         help='OpenSky scan window start: "HH:MM" (on the given '
                              'date) or "YYYY-MM-DD HH:MM", UTC')
@@ -109,6 +110,14 @@ def main(argv=None):
     parser.add_argument("--name", help="output filename (default: auto)")
     args = parser.parse_args(argv)
     args.date_str = args.date.strftime("%Y-%m-%d")
+
+    if not 0 <= args.pad <= 48:
+        _eprint("error: --pad must be between 0 and 48 hours")
+        return 2
+    if args.name and (args.name in (".", "..")
+                      or "/" in args.name or "\\" in args.name):
+        _eprint("error: --name must be a plain filename, not a path")
+        return 2
 
     try:
         ident = ident_mod.parse(args.flight)
@@ -123,7 +132,8 @@ def main(argv=None):
 
     session = http.make_session()
     client = OpenSky.from_env(session=session)
-    cutoff = int(now.timestamp()) - ANON_HORIZON
+    now_ts = int(now.timestamp())
+    cutoff = now_ts - ANON_HORIZON
 
     begin = int(args.date.timestamp()) - args.pad * 3600
     end = begin + 86400 + 2 * args.pad * 3600
@@ -135,6 +145,8 @@ def main(argv=None):
     except ValueError as exc:
         _eprint(f"error: {exc}")
         return 2
+    # nothing exists in the future; don't spend quota scanning it
+    end = min(end, now_ts)
     if end <= begin:
         _eprint("error: scan window is empty (check --utc-from/--utc-to)")
         return 2
@@ -169,7 +181,7 @@ def main(argv=None):
 
         try:
             flights = find_flights(client, ident, begin, end, progress=progress)
-        except (http.ApiError, RuntimeError) as exc:
+        except RuntimeError as exc:  # http.ApiError is a RuntimeError
             _eprint(f"error: {exc}")
             return 2
         if (not flights and args.source == "auto"
@@ -195,7 +207,7 @@ def main(argv=None):
         return 1
 
     _list_flights(flights)
-    if not args.pick:
+    if args.pick is None:
         _eprint(f"\n{len(flights)} flight(s). Re-run with --pick N to download "
                 "the KML.")
         return 0
