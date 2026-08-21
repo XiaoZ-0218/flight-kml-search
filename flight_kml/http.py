@@ -1,7 +1,8 @@
 """HTTP helpers with a strict egress policy.
 
-Only plain http/https to an allowlist of known data hosts is permitted, and
-the resolved address must not be loopback / private / reserved.
+Only https to an allowlist of known data hosts is permitted, redirects are
+never followed (a 3xx would point outside the allowlist unchecked), and the
+resolved address must be a public unicast IP.
 """
 import ipaddress
 import socket
@@ -30,15 +31,24 @@ class ApiError(RuntimeError):
 
 def _check_url(url):
     parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"refusing non-http(s) URL: {url}")
+    if parsed.scheme != "https":
+        raise ValueError(f"refusing non-https URL: {url}")
     host = parsed.hostname or ""
     if host not in ALLOWED_HOSTS:
         raise ValueError(f"host not allowed: {host}")
     for info in socket.getaddrinfo(host, None):
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_loopback or ip.is_private or ip.is_reserved or ip.is_link_local:
+        if (ip.is_loopback or ip.is_private or ip.is_reserved
+                or ip.is_link_local or ip.is_multicast or ip.is_unspecified):
             raise ValueError(f"refusing to contact {host} at {ip}")
+
+
+def _checked_json(resp, url):
+    try:
+        return resp.json()
+    except ValueError:
+        raise ApiError(resp.status_code, url,
+                       f"non-JSON response: {resp.text[:100]}") from None
 
 
 def make_session():
@@ -49,25 +59,27 @@ def make_session():
 
 def get_json(session, url, params=None, headers=None, timeout=30):
     _check_url(url)
-    resp = session.get(url, params=params, headers=headers, timeout=timeout)
+    resp = session.get(url, params=params, headers=headers, timeout=timeout,
+                       allow_redirects=False)
     if resp.status_code != 200:
         raise ApiError(resp.status_code, url, resp.text)
-    return resp.json()
+    return _checked_json(resp, url)
 
 
 def post_form(session, url, data, timeout=30):
     _check_url(url)
-    resp = session.post(url, data=data, timeout=timeout)
+    resp = session.post(url, data=data, timeout=timeout,
+                        allow_redirects=False)
     if resp.status_code != 200:
         raise ApiError(resp.status_code, url, resp.text)
-    return resp.json()
+    return _checked_json(resp, url)
 
 
 def get_bytes(session, url, timeout=60):
     """Raw body; some trace hosts serve gzip without a Content-Encoding
     header, so callers should sniff magic bytes."""
     _check_url(url)
-    resp = session.get(url, timeout=timeout)
+    resp = session.get(url, timeout=timeout, allow_redirects=False)
     if resp.status_code != 200:
         raise ApiError(resp.status_code, url, resp.text[:200])
     return resp.content
