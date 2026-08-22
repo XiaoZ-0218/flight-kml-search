@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.9"
-# dependencies = ["requests>=2.31"]
+# dependencies = ["requests>=2.31,<3"]
 # ///
 """flight-kml-search entry point.
 

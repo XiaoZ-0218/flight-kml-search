@@ -47,6 +47,21 @@ class KmlTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             kml.build_kml([], "x", "y")
 
+    def test_none_altitudes_filled_from_neighbours(self):
+        pts = [(1786752000, -122.0, 37.0, None),
+               (1786752100, -121.0, 38.0, 1000.0),
+               (1786752200, -120.0, 39.0, None)]
+        root = safe_parse(kml.build_kml(pts, "x"))
+        coords = [c.text for c in root.findall(f".//{GX}coord")]
+        # leading None back-filled from the next known value, trailing None
+        # forward-filled — ground points must not sink to 0 m
+        self.assertEqual([c.split()[2] for c in coords],
+                         ["1000", "1000", "1000"])
+
+    def test_describe_handles_empty_points(self):
+        desc = kml.describe_flight("UA888", "2026-08-15", "UAL888", [], "x")
+        self.assertIn("0 ADS-B positions", desc)
+
     def test_description_mentions_source(self):
         desc = kml.describe_flight("UA888", "2026-08-15", "UAL888", POINTS,
                                    "adsb.lol")

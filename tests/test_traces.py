@@ -32,9 +32,9 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(ts, int(DAY) + 1000)
         self.assertEqual((lat, lon), (38.0, -122.0))
         self.assertAlmostEqual(alt_m, 5000 * 0.3048)
-        # "ground" and None altitude -> 0
-        self.assertEqual(points[0][3], 0.0)
-        self.assertEqual(points[3][3], 0.0)
+        # "ground" and None altitude stay None (kml.build_kml fills them)
+        self.assertIsNone(points[0][3])
+        self.assertIsNone(points[3][3])
 
     def test_parse_empty(self):
         self.assertEqual(traces.parse_trace({"timestamp": DAY, "trace": []}), [])

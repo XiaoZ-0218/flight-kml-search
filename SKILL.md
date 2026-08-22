@@ -29,7 +29,7 @@ Two steps are involved, each with its own sources and automatic failover:
 
 | Source | Coverage | Notes |
 | --- | --- | --- |
-| `opensky` | last ~24h anonymous; older with free OpenSky credentials | small anonymous daily quota; 429 = burned until tomorrow |
+| `opensky` | current UTC day only when anonymous (earlier windows get 403, verified 2026-08-22); older with free OpenSky credentials | small anonymous daily quota; 429 = burned until tomorrow |
 | `csv` | ~2024-07 onward, **gaps near the present** (archive lags by weeks+) | ADSBexchange daily arrivals CSV (~13 MB/day, cached in `~/.cache/flight-kml-search`); keyed by arrival day |
 
 `--source auto` (default) picks: OpenSky when the date is within anonymous
@@ -114,7 +114,7 @@ The CSV source ignores these flags (it reads whole-day files anyway).
 | --- | --- |
 | `--source auto\|opensky\|csv` | Discovery source (default auto). |
 | `--pick N` | Download the Nth listed flight (1-based) as KML. Without it, only list. |
-| `--pad HOURS` | OpenSky scan: hours before/after the UTC date (default 12). |
+| `--pad HOURS` | OpenSky scan: hours before/after the UTC date (default 12, max 48). |
 | `--utc-from T` / `--utc-to T` | Narrow OpenSky scan window, UTC (`HH:MM` or `YYYY-MM-DD HH:MM`). |
 | `--out DIR` | Output directory (default: current directory). |
 | `--name STR` | Output filename override. |
@@ -130,9 +130,11 @@ The CSV source ignores these flags (it reads whole-day files anyway).
 
 ## Notes
 
-- For dates within the last ~24h the OpenSky path is tried first; if the
-  anonymous quota is burned (429), wait for the daily reset or set the
-  credentials env vars.
+- Anonymous OpenSky only serves the current UTC day (verified 2026-08-22:
+  earlier windows get 403 "You cannot access historical flights"). Yesterday
+  still routes to OpenSky but only post-midnight-UTC spillover is reachable;
+  for anything older, set the credentials env vars. If the anonymous quota is
+  burned (429), wait for the daily reset.
 - If no source has the flight (small airports, blocked aircraft, very recent
   archive gap), say so and suggest checking FlightAware manually — its
   tracklog KML needs a logged-in browser session, which is why this skill

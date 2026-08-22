@@ -13,6 +13,11 @@ class ParseTest(unittest.TestCase):
         p = ident.parse("ua 888")
         self.assertEqual(p.icao, "UAL")
 
+    def test_hyphen_separator(self):
+        p = ident.parse("UA-888")
+        self.assertEqual(p.icao, "UAL")
+        self.assertEqual(p.digits, "888")
+
     def test_chinese_numeric_prefix(self):
         p = ident.parse("3U8735")
         self.assertEqual(p.icao, "CSC")

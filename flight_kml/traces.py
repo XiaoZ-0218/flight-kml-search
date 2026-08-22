@@ -32,7 +32,11 @@ def _day_start(ts):
 
 
 def parse_trace(obj):
-    """trace_full JSON -> [(unix_ts, lon, lat, alt_m), ...] sorted by time."""
+    """trace_full JSON -> [(unix_ts, lon, lat, alt_m|None), ...] by time.
+
+    "ground"/missing altitudes stay None; kml.build_kml fills them from
+    neighbouring points instead of sinking them to sea level.
+    """
     base = obj.get("timestamp")
     rows = obj.get("trace") or []
     if base is None or not rows:
@@ -44,7 +48,7 @@ def parse_trace(obj):
             continue
         alt = row[3] if len(row) > 3 else None
         if alt is None or alt == "ground":
-            alt_m = 0.0
+            alt_m = None
         else:
             alt_m = float(alt) * FT_TO_M
         points.append((int(base + offset), float(lon), float(lat), alt_m))
